@@ -92,20 +92,22 @@ function updateRawValues(rawData){
 
             // print coin earnings
             var row = table.insertRow();
-            var cell = row.appendChild(document.createElement("td"));
-            cell.innerHTML = "<b>"+ currency +"<br/>Estimated<br/>Earnings<b>";
-            cell = row.appendChild(document.createElement("td"));
-            cell.setAttribute("colspan", earningsColspan);
-            cell.innerHTML = earnings;
+			if(lentSum > 0) {
+				var cell = row.appendChild(document.createElement("td"));
+				cell.innerHTML = "<b>"+ currency +"<br/>Estimated<br/>Earnings<b>";
+				cell = row.appendChild(document.createElement("td"));
+				cell.setAttribute("colspan", earningsColspan);
+				cell.innerHTML = earnings;
 
-            // print coin BTC earnings
-            if(!isNaN(highestBidBTC)) {
-                var cell = row.appendChild(document.createElement("td"));
-                    cell.innerHTML = "<b>"+ couple +"<br/>highest bid:<br/>"+ printFloat(highestBidBTC,8) +"<b>";
-                var cell = row.appendChild(document.createElement("td"));
-                    cell.setAttribute("colspan", rowValues.length - earningsColspan - 1);
-                    cell.innerHTML = earningsBTC;
-            }
+				// print coin BTC earnings
+				if(!isNaN(highestBidBTC)) {
+					var cell = row.appendChild(document.createElement("td"));
+						cell.innerHTML = "<b>"+ couple +"<br/>highest bid:<br/>"+ printFloat(highestBidBTC, 8) +"<b>";
+					var cell = row.appendChild(document.createElement("td"));
+						cell.setAttribute("colspan", rowValues.length - earningsColspan - 1);
+						cell.innerHTML = earningsBTC;
+				}
+			}
         }
     }
 
@@ -176,7 +178,7 @@ function Timespan(name, multiplier) {
     };
     this.formatEarnings = function(currency, earnings) {
         if(currency == "BTC" && this == Hour) {
-            return Math.round(earnings * 100000000) + " Satoshi / Hour<br/>";
+            return printFloat(earnings * 100000000, 0) + " Satoshi / Hour<br/>";
         } else {
             return printFloat(earnings, 8) + " " + currency + " / " + name + "<br/>";
         }
