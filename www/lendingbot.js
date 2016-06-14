@@ -101,7 +101,7 @@ function updateRawValues(rawData){
             // print coin BTC earnings
             if(!isNaN(highestBidBTC)) {
                 var cell = row.appendChild(document.createElement("td"));
-                    cell.innerHTML = "<b>"+ couple +"<br/>highest bid:<br/>"+ highestBidBTC +"<b>";
+                    cell.innerHTML = "<b>"+ couple +"<br/>highest bid:<br/>"+ printFloat(highestBidBTC,8) +"<b>";
                 var cell = row.appendChild(document.createElement("td"));
                     cell.setAttribute("colspan", rowValues.length - earningsColspan - 1);
                     cell.innerHTML = earningsBTC;
