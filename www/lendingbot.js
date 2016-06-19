@@ -75,6 +75,14 @@ function updateRawValues(rawData){
                 roundFloat(totalCoins, 10000)  + ' ' + currency,
                 roundFloat(effectiveRate, 100000) + '%' ]
 
+		if(currency == "BTC") {
+		    var rowValues = ["bit",
+		        roundFloat(lentSum * 1000000, 10000) + ' bits',
+		        roundFloat(averageLendingRate, 100000)  + '%',
+		        roundFloat(totalCoins * 1000000, 10000)  + ' bits',
+		        roundFloat(effectiveRate, 100000) + '%' ]
+		}
+
 			// print coin status
             var row = table.insertRow();
             for (var i = 0; i < rowValues.length; ++i) {
@@ -174,8 +182,8 @@ function Timespan(name, multiplier) {
 		return sum * rate * this.multiplier;
 	};
 	this.formatEarnings = function(currency, earnings) {
-		if(currency == "BTC" && this == Hour) {
-			return Math.round(earnings * 100000000) + " Satoshi / Hour<br/>";
+		if(currency == "BTC") {
+			return Math.round(earnings * 100000000)/100 + " bits / " + name + "<br/>";
 		} else {
 			return roundFloat(earnings, 100000000) + " " + currency + " / " + name + "<br/>";
 		}
