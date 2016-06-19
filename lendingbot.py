@@ -247,7 +247,10 @@ def stringifyTotalLended():
 	result = 'Lended: '
 	for key in sorted(totalLended):
 		averageLendingRate = Decimal(rateLended[key]*100/totalLended[key])
-		result += '[%.4f %s @ %.4f%%] ' % (Decimal(totalLended[key]), key, averageLendingRate)
+		if key == 'BTC': #Se for bitcoins, imprimir valor em bits (uBTC)
+			result += '[%.2f %s @ %.4f%%] ' % (Decimal(totalLended[key]*1000000), 'bits', averageLendingRate)
+		else:
+			result += '[%.6f %s @ %.4f%%] ' % (Decimal(totalLended[key]), key, averageLendingRate)
 		log.updateStatusValue(key, "lentSum", totalLended[key])
 		log.updateStatusValue(key, "averageLendingRate", averageLendingRate)
 	return result
