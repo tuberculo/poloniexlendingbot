@@ -84,7 +84,10 @@ class Logger(object):
 		self.refreshStatus()
 
 	def offer(self, amt, cur, rate, days, msg):
-		line = self.timestamp() + ' Placing ' + str(amt) + ' ' + str(cur) + ' at ' + str(float(rate)*100) + '% for ' + days + ' days... ' + self.digestApiMsg(msg)
+		if cur == 'BTC':
+			line = self.timestamp() + ' Placing ' + str(float(amt)*1000000) + ' ' + str('bits') + ' at ' + str(float(rate)*100) + '% for ' + days + ' days... ' + self.digestApiMsg(msg)
+		else:
+			line = self.timestamp() + ' Placing ' + str(amt) + ' ' + str(cur) + ' at ' + str(float(rate)*100) + '% for ' + days + ' days... ' + self.digestApiMsg(msg)
 		self.console.printline(line)
 		self.refreshStatus()
 
