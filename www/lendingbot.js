@@ -1,10 +1,15 @@
+// vim: ts=4:sw=4:et
+
 var localFile, reader;
 
-var	Hour = new Timespan("Hour",1/24);
-var	Day = new Timespan("Day",1);
-var	Week = new Timespan("Week",7);
-var	Month = new Timespan("Month",30);
+var Hour = new Timespan("Hour",1/24);
+var Day = new Timespan("Day",1);
+var Week = new Timespan("Week",7);
+var Month = new Timespan("Month",30);
 var timespans = [Month, Week, Day, Hour];
+var Coin_Val = 1.00000000;
+var Coin = "BTC";
+var effRateMode = 'lentperc';
 
 function updateJson(data) {
     $('#status').text(data.last_status);
@@ -17,7 +22,16 @@ function updateJson(data) {
         table.append($('<tr/>').append($('<td colspan="2" />').text(data.log[i])));
     }
 
+    updateOutputCurrency(data.outputCurrency);
     updateRawValues(data.raw_data);
+}
+
+function updateOutputCurrency(outputCurrency){
+    var OutCurr = Object.keys(outputCurrency);
+    Coin = outputCurrency['currency'];
+    if (Coin != "BTC") {
+        Coin_Val = parseFloat(outputCurrency['highestBid']);
+    }
 }
 
 function updateRawValues(rawData){
@@ -31,107 +45,129 @@ function updateRawValues(rawData){
         var averageLendingRate = parseFloat(rawData[currency]['averageLendingRate']);
         var lentSum = parseFloat(rawData[currency]['lentSum']);
         var totalCoins = parseFloat(rawData[currency]['totalCoins']);
+        var maxToLend = parseFloat(rawData[currency]['maxToLend']);
         var highestBidBTC = parseFloat(rawData[currency]['highestBid']);
         var couple = rawData[currency]['couple'];
 
-        if(!isNaN(averageLendingRate) && !isNaN(lentSum) || !isNaN(totalCoins))
+        if (!isNaN(averageLendingRate) && !isNaN(lentSum) || !isNaN(totalCoins))
         {
 
             // cover cases where totalCoins isn't updated because all coins are lent
-            if(isNaN(totalCoins) && !isNaN(lentSum)) {
+            if (isNaN(totalCoins) && !isNaN(lentSum)) {
                 totalCoins = lentSum;
             }
             var rate = +averageLendingRate  * 0.85 / 100; // 15% goes to Poloniex fees
 
-			var earnings = '';
-			var earningsBTC = '';
-			timespans.forEach(function(timespan) {
-				// init totalBTCEarnings
-				if(isNaN(totalBTCEarnings[timespan.name])) {
-					totalBTCEarnings[timespan.name] = 0;
-				}
+            var earnings = '';
+            var earningsBTC = '';
+            timespans.forEach(function(timespan) {
+                // init totalBTCEarnings
+                if (isNaN(totalBTCEarnings[timespan.name])) {
+                    totalBTCEarnings[timespan.name] = 0;
+                }
 
-				// calculate coin earnings
-				timespanEarning = timespan.calcEarnings(lentSum, rate);
-				earnings += timespan.formatEarnings(currency, timespanEarning);
-				if(currency == 'BTC') {
-					totalBTCEarnings[timespan.name] += timespanEarning;
-				}
+                // calculate coin earnings
+                timespanEarning = timespan.calcEarnings(lentSum, rate);
+                earnings += timespan.formatEarnings(currency, timespanEarning);
+                if (currency == 'BTC') {
+                    totalBTCEarnings[timespan.name] += timespanEarning;
+                }
 
-				// calculate BTC earnings
-				if(!isNaN(highestBidBTC)) {
-					timespanEarningBTC = timespan.calcEarnings(lentSum * highestBidBTC, rate);
-					earningsBTC += timespan.formatEarnings("BTC", timespanEarningBTC);
-					totalBTCEarnings[timespan.name] += timespanEarningBTC;
-				}
-			});
+                // calculate BTC earnings
+                if (!isNaN(highestBidBTC) && !(currency == 'BTC')) {
+                    timespanEarningBTC = timespan.calcEarnings(lentSum * highestBidBTC, rate);
+                    earningsBTC += timespan.formatEarnings("BTC", timespanEarningBTC);
+                    totalBTCEarnings[timespan.name] += timespanEarningBTC;
+                }
+            });
 
 
-            var effectiveRate = lentSum * rate * 100 / totalCoins;
+            var effectiveRate;
+            if (effRateMode == 'lentperc')
+                effectiveRate = lentSum * rate * 100 / totalCoins;
+            else
+                effectiveRate = rate * 100;
+            var yearlyRate = effectiveRate * 365; // no reinvestment
+            var yearlyRateReinv = (Math.pow(effectiveRate / 100 + 1, 365) - 1) * 100; // with daily reinvestment
+            var lentPerc = lentSum / totalCoins * 100;
+            var lentPercLendable = lentSum / maxToLend * 100;
+            function makeTooltip(title, text) {
+                return '&nbsp;<a data-toggle="tooltip" class="plb-tooltip" title="' + title + '">' + text + '</a>';
+            }
+            var avgRateText = makeTooltip("Average loan rate, simple average calculation of active loans rates.", "Avg.");
+            var effRateText;
+            if (effRateMode == 'lentperc')
+                effRateText = makeTooltip("Effective loan rate, considering lent precentage and poloniex 15% fee.", "Eff.");
+            else
+                effRateText = makeTooltip("Effective loan rate, considering poloniex 15% fee.", "Eff.");
+            var compoundRateText = makeTooltip("Compound yearly rate, the result of reinvesting the interest.", "Comp.");
+            var lentStr = 'Lent ' + printFloat(lentSum, 4) +' of ' + printFloat(totalCoins, 4) + ' (' + printFloat(lentPerc, 2) + '%)';
 
-            var rowValues = [currency,
-                roundFloat(lentSum, 10000) + ' ' + currency,
-                roundFloat(averageLendingRate, 100000)  + '%',
-                roundFloat(totalCoins, 10000)  + ' ' + currency,
-                roundFloat(effectiveRate, 100000) + '%' ]
+            if (totalCoins != maxToLend) {
+                lentStr += ' <b>Total</b><br/>Lent ' + printFloat(lentSum, 4) + ' of ' + printFloat(maxToLend, 4) + ' (' + printFloat(lentPercLendable, 2) + '%) <b>Lendable</b>';
+            }
 
-			// print coin status
+            var rowValues = ["<b>" + currency + "</b>", lentStr,
+                "<div class='inlinediv' >" + printFloat(averageLendingRate, 5) + '% Day' + avgRateText + '<br/>'
+                    + printFloat(effectiveRate, 5) + '% Day' + effRateText + '<br/></div>'
+                    + "<div class='inlinediv' >" + printFloat(yearlyRate, 2) + '% Year<br/>'
+                    +  printFloat(yearlyRateReinv, 2) + '% Year' + compoundRateText + "</div>" ];
+
+            // print coin status
             var row = table.insertRow();
             for (var i = 0; i < rowValues.length; ++i) {
                 var cell = row.appendChild(document.createElement("td"));
                 cell.innerHTML = rowValues[i];
+                cell.style.verticalAlign = "text-top";
+                if (i == 0) {
+                    cell.setAttribute("width", "20%");
+                }
             }
-
+            $(row).find('[data-toggle="tooltip"]').tooltip();
 
             var earningsColspan = rowValues.length - 1;
-
-			// adjust coin earnings table cell span for BTC earnings
-            if(!isNaN(highestBidBTC)) {
-                earningsColspan = Math.round(earningsColspan / 2);
-            }
-
             // print coin earnings
-			var row = table.insertRow();
-            var cell = row.appendChild(document.createElement("td"));
-            cell.innerHTML = "<b>"+ currency +"<br/>Estimated<br/>Earnings<b>";
-            cell = row.appendChild(document.createElement("td"));
-            cell.setAttribute("colspan", earningsColspan);
-            cell.innerHTML = earnings;
-
-			// print coin BTC earnings
-            if(!isNaN(highestBidBTC)) {
-                var cell = row.appendChild(document.createElement("td"));
-                    cell.innerHTML = "<b>"+ couple +"<br/>highest bid:<br/>"+ highestBidBTC +"<b>";
-                var cell = row.appendChild(document.createElement("td"));
-                    cell.setAttribute("colspan", rowValues.length - earningsColspan - 1);
-                    cell.innerHTML = earningsBTC;
+            var row = table.insertRow();
+            if (lentSum > 0) {
+                var cell1 = row.appendChild(document.createElement("td"));
+                cell1.innerHTML = "<span class='hidden-xs'>"+ currency +"<br/></span>Estimated<br/>Earnings";
+                var cell2 = row.appendChild(document.createElement("td"));
+                cell2.setAttribute("colspan", earningsColspan);
+                if (!isNaN(highestBidBTC)) {
+                    cell1.innerHTML += "<br/><span class='hidden-xs'><br/>" + couple +"</span> highest bid: "+ printFloat(highestBidBTC, 8);
+                    cell2.innerHTML = "<div class='inlinediv' >" + earnings + "<br/></div><div class='inlinediv' style='padding-right:0px'>"+ earningsBTC + "</div>";
+                } else {
+                    cell2.innerHTML = "<div class='inlinediv' >" +earnings + "</div>";
+                }
             }
         }
     }
 
-	// add headers
-	var thead = table.createTHead();
-	var row = thead.insertRow();
-	var rowValues = ["Coin", "Active Loans", "Average Loan<br/>Interest Rate", "Total", "Effective<br/>Interest Rate"];
-	for (var i = 0; i < rowValues.length; ++i) {
-		var cell = row.appendChild(document.createElement("th"));
-		cell.innerHTML = rowValues[i];
-	}
+    // add headers
+    var thead = table.createTHead();
 
-	// show account summary
-	if(currencies.length > 1) {
-		earnings = '';
-		timespans.forEach(function(timespan) {
-			earnings += timespan.formatEarnings( 'BTC', totalBTCEarnings[timespan.name]);
-		});
-		var row = thead.insertRow(0);
-		var cell = row.appendChild(document.createElement("th"));
-		cell.innerHTML = "Account<br/>Estimated<br/>Earnings";
-		cell.style.verticalAlign = "text-top";
-		cell = row.appendChild(document.createElement("th"));
-		cell.setAttribute("colspan", rowValues.length - 1);
-		cell.innerHTML = earnings;
-	}
+    // show account summary
+    if (currencies.length > 1) {
+        earnings = '';
+        timespans.forEach(function(timespan) {
+            if (Coin == "BTC") {
+                earnings += timespan.formatEarnings( Coin, totalBTCEarnings[timespan.name]);
+            }
+            if (Coin == "USDT") {
+                earnings += timespan.formatEarnings( Coin, totalBTCEarnings[timespan.name]*Coin_Val);
+            }
+            if (Coin != "BTC" && Coin != "USDT") {
+                earnings += timespan.formatEarnings( Coin, totalBTCEarnings[timespan.name]/Coin_Val);
+            }
+        });
+        var row = thead.insertRow(0);
+        var cell = row.appendChild(document.createElement("th"));
+        cell.innerHTML = "Account<br/>Estimated<br/>Earnings";
+        cell.style.verticalAlign = "text-top";
+        cell = row.appendChild(document.createElement("th"));
+        cell.setAttribute("colspan", 2);
+        cell.innerHTML = earnings;
+    }
 }
 
 function handleLocalFile(file) {
@@ -144,7 +180,7 @@ function handleLocalFile(file) {
 }
 
 function loadData() {
-    if(localFile) {
+    if (localFile) {
         reader.readAsText(localFile, 'utf-8');
         setTimeout('loadData()',30000)
     } else {
@@ -155,36 +191,63 @@ function loadData() {
             // reload every 30sec
             setTimeout('loadData()',30000)
         }).fail( function(d, textStatus, error) {
-           $('#status').text("getJSON failed, status: " + textStatus + ", error: "+error);
-           // retry after 60sec
-           setTimeout('loadData()',60000)
+            $('#status').text("getJSON failed, status: " + textStatus + ", error: "+error);
+            // retry after 60sec
+            setTimeout('loadData()',60000)
         });;
     }
 }
 
-function roundFloat(value, roundFigure) {
-    var result = Math.round(value * roundFigure) / roundFigure;
-    return result = isNaN(result) ? 0 : result;
+function printFloat(value, precision) {
+    var multiplier = Math.pow(10, precision);
+    var result = Math.round(value * multiplier) / multiplier;
+    return result = isNaN(result) ? "0" : result.toFixed(precision);
 }
 
 function Timespan(name, multiplier) {
     this.name = name;
     this.multiplier = multiplier;
-	this.calcEarnings = function(sum, rate) {
-		return sum * rate * this.multiplier;
-	};
-	this.formatEarnings = function(currency, earnings) {
-		if(currency == "BTC" && this == Hour) {
-			return Math.round(earnings * 100000000) + " Satoshi / Hour<br/>";
-		} else {
-			return roundFloat(earnings, 100000000) + " " + currency + " / " + name + "<br/>";
-		}
-	};
+    this.calcEarnings = function(sum, rate) {
+        return sum * rate * this.multiplier;
+    };
+    this.formatEarnings = function(currency, earnings) {
+        if (currency == "BTC" && this == Hour) {
+            return printFloat(earnings * 100000000, 0) + " Satoshi / " + name + "<br/>";
+        } else {
+            var currencyClass = '';
+            if (currency != "BTC" && currency != "USDT") {
+                currencyClass = 'hidden-xs';
+            }
+            return printFloat(earnings, 8) + " <span class=" + currencyClass + ">" + currency + "</span> / "+  name + "<br/>";
+        }
+    };
+}
+
+function setEffRateMode() {
+    var validModes = ['lentperc', 'onlyfee'];
+    var q = location.search.match(/[\?&]effrate=[^&]+/);
+
+    if (q) {
+        //console.log('Got effective rate mode from URI');
+        effRateMode = q[0].split('=')[1];
+    } else {
+        if (localStorage.effRateMode) {
+            //console.log('Got effective rate mode from localStorage');
+            effRateMode = localStorage.effRateMode;
+        }
+    }
+    if (validModes.indexOf(effRateMode) == -1) {
+        console.error(effRateMode + ' is not valid effective rate mode! Valid values are ' + validModes);
+        effRateMode = validModes[0];
+    }
+    localStorage.effRateMode = effRateMode;
+    console.log('Effective rate mode: ' + effRateMode);
 }
 
 $(document).ready(function () {
+    setEffRateMode();
     loadData();
-    if(window.location.protocol == "file:") {
+    if (window.location.protocol == "file:") {
         $('#file').show();
     }
 });
